@@ -1,1 +1,16 @@
 run = "npm run build && npm run start"
+language = "nodejs"
+entrypoint = "server/index.js"
+modules = ["nodejs-20", "nix"]
+
+[nix]
+channel = "stable-23_11"
+
+[deployment]
+build = "npm install && npm run build"
+run = ["sh", "-c", "npm run start"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 3000
+externalPort = 80

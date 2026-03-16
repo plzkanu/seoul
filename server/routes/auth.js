@@ -6,12 +6,13 @@ import { SECRET } from '../middleware.js';
 
 const router = Router();
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: '아이디와 비밀번호를 입력하세요.' });
   }
-  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  const { rows } = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+  const user = rows[0];
   if (!user || !bcrypt.compareSync(password, user.password)) {
     return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
   }

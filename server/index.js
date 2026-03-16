@@ -13,8 +13,6 @@ const __dirname = dirname(__filename);
 
 const app = express();
 
-initDb();
-
 app.use(cors());
 app.use(express.json());
 
@@ -30,6 +28,13 @@ if (isProd) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`서버 실행: http://localhost:${PORT} (${isProd ? 'production' : 'development'})`);
-});
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`서버 실행: http://localhost:${PORT} (${isProd ? 'production' : 'development'})`);
+    });
+  })
+  .catch((err) => {
+    console.error('DB 초기화 실패:', err.message);
+    process.exit(1);
+  });

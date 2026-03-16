@@ -1,51 +1,56 @@
-import Database from 'better-sqlite3';
+import pg from 'pg';
 import bcrypt from 'bcryptjs';
-import { DB_PATH } from './config.js';
+import { DATABASE_URL } from './config.js';
 
-const db = new Database(DB_PATH);
+const { Pool } = pg;
+const pool = DATABASE_URL
+  ? new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } })
+  : null;
 
-export function initDb() {
-  db.exec(`
+export async function initDb() {
+  if (!pool) {
+    throw new Error('DATABASE_URL이 설정되지 않았습니다. Replit Secrets 또는 .env에 설정하세요.');
+  }
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       name TEXT NOT NULL,
       role TEXT DEFAULT 'user',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS documents (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       status TEXT DEFAULT 'draft',
-      author_id INTEGER NOT NULL,
-      approver_id INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      approved_at DATETIME,
-      FOREIGN KEY (author_id) REFERENCES users(id),
-      FOREIGN KEY (approver_id) REFERENCES users(id)
+      author_id INTEGER NOT NULL REFERENCES users(id),
+      approver_id INTEGER REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      approved_at TIMESTAMP
     );
 
     CREATE INDEX IF NOT EXISTS idx_docs_author ON documents(author_id);
     CREATE INDEX IF NOT EXISTS idx_docs_status ON documents(status);
   `);
 
-  const count = db.prepare('SELECT COUNT(*) as c FROM users').get();
-  if (count.c === 0) {
+  const { rows } = await pool.query('SELECT COUNT(*) as c FROM users');
+  if (parseInt(rows[0].c, 10) === 0) {
     const hash = bcrypt.hashSync('admin123', 10);
-    db.prepare(`
-      INSERT INTO users (username, password, name, role)
-      VALUES ('admin', ?, '관리자', 'admin')
-    `).run(hash);
-    db.prepare(`
-      INSERT INTO users (username, password, name, role)
-      VALUES ('user1', ?, '홍길동', 'user')
-    `).run(bcrypt.hashSync('user123', 10));
+    await pool.query(
+      `INSERT INTO users (username, password, name, role) VALUES ($1, $2, $3, $4)`,
+      ['admin', hash, '관리자', 'admin']
+    );
+    await pool.query(
+      `INSERT INTO users (username, password, name, role) VALUES ($1, $2, $3, $4)`,
+      ['user1', bcrypt.hashSync('user123', 10), '홍길동', 'user']
+    );
     console.log('초기 사용자 생성: admin/admin123, user1/user123');
   }
 }
 
-export default db;
+export default pool;

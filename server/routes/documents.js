@@ -6,7 +6,7 @@ const router = Router();
 
 router.use(authMiddleware);
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { status, my } = req.query;
   let sql = `
     SELECT d.*, u.name as author_name, a.name as approver_name
@@ -16,27 +16,29 @@ router.get('/', (req, res) => {
     WHERE 1=1
   `;
   const params = [];
+  let idx = 1;
   if (status) {
-    sql += ' AND d.status = ?';
+    sql += ` AND d.status = $${idx++}`;
     params.push(status);
   }
   if (my === 'true') {
-    sql += ' AND d.author_id = ?';
+    sql += ` AND d.author_id = $${idx++}`;
     params.push(req.user.id);
   }
   sql += ' ORDER BY d.created_at DESC';
-  const docs = db.prepare(sql).all(...params);
-  res.json(docs);
+  const { rows } = await db.query(sql, params);
+  res.json(rows);
 });
 
-router.get('/:id', (req, res) => {
-  const doc = db.prepare(`
+router.get('/:id', async (req, res) => {
+  const { rows } = await db.query(`
     SELECT d.*, u.name as author_name, a.name as approver_name
     FROM documents d
     LEFT JOIN users u ON d.author_id = u.id
     LEFT JOIN users a ON d.approver_id = a.id
-    WHERE d.id = ?
-  `).get(req.params.id);
+    WHERE d.id = $1
+  `, [req.params.id]);
+  const doc = rows[0];
   if (!doc) return res.status(404).json({ error: '문서를 찾을 수 없습니다.' });
   if (doc.author_id !== req.user.id && doc.approver_id !== req.user.id && req.user.role !== 'admin') {
     return res.status(403).json({ error: '조회 권한이 없습니다.' });
@@ -44,20 +46,22 @@ router.get('/:id', (req, res) => {
   res.json(doc);
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const { title, content, approver_id } = req.body;
   if (!title || !content) {
     return res.status(400).json({ error: '제목과 내용을 입력하세요.' });
   }
-  const result = db.prepare(`
+  const { rows } = await db.query(`
     INSERT INTO documents (title, content, author_id, approver_id)
-    VALUES (?, ?, ?, ?)
-  `).run(title, content, req.user.id, approver_id || null);
-  res.status(201).json({ id: result.lastInsertRowid, message: '문서가 등록되었습니다.' });
+    VALUES ($1, $2, $3, $4)
+    RETURNING id
+  `, [title, content, req.user.id, approver_id || null]);
+  res.status(201).json({ id: rows[0].id, message: '문서가 등록되었습니다.' });
 });
 
-router.patch('/:id/approve', (req, res) => {
-  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+router.patch('/:id/approve', async (req, res) => {
+  const { rows } = await db.query('SELECT * FROM documents WHERE id = $1', [req.params.id]);
+  const doc = rows[0];
   if (!doc) return res.status(404).json({ error: '문서를 찾을 수 없습니다.' });
   if (doc.status !== 'pending') {
     return res.status(400).json({ error: '결재 대기 중인 문서만 결재할 수 있습니다.' });
@@ -65,15 +69,16 @@ router.patch('/:id/approve', (req, res) => {
   if (doc.approver_id && doc.approver_id !== req.user.id && req.user.role !== 'admin') {
     return res.status(403).json({ error: '결재 권한이 없습니다.' });
   }
-  db.prepare(`
-    UPDATE documents SET status = 'approved', approver_id = ?, approved_at = datetime('now'), updated_at = datetime('now')
-    WHERE id = ?
-  `).run(req.user.id, req.params.id);
+  await db.query(`
+    UPDATE documents SET status = 'approved', approver_id = $1, approved_at = NOW(), updated_at = NOW()
+    WHERE id = $2
+  `, [req.user.id, req.params.id]);
   res.json({ message: '결재가 완료되었습니다.' });
 });
 
-router.patch('/:id/reject', (req, res) => {
-  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+router.patch('/:id/reject', async (req, res) => {
+  const { rows } = await db.query('SELECT * FROM documents WHERE id = $1', [req.params.id]);
+  const doc = rows[0];
   if (!doc) return res.status(404).json({ error: '문서를 찾을 수 없습니다.' });
   if (doc.status !== 'pending') {
     return res.status(400).json({ error: '결재 대기 중인 문서만 반려할 수 있습니다.' });
@@ -81,15 +86,16 @@ router.patch('/:id/reject', (req, res) => {
   if (doc.approver_id && doc.approver_id !== req.user.id && req.user.role !== 'admin') {
     return res.status(403).json({ error: '반려 권한이 없습니다.' });
   }
-  db.prepare(`
-    UPDATE documents SET status = 'rejected', approver_id = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `).run(req.user.id, req.params.id);
+  await db.query(`
+    UPDATE documents SET status = 'rejected', approver_id = $1, updated_at = NOW()
+    WHERE id = $2
+  `, [req.user.id, req.params.id]);
   res.json({ message: '문서가 반려되었습니다.' });
 });
 
-router.patch('/:id/submit', (req, res) => {
-  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+router.patch('/:id/submit', async (req, res) => {
+  const { rows } = await db.query('SELECT * FROM documents WHERE id = $1', [req.params.id]);
+  const doc = rows[0];
   if (!doc) return res.status(404).json({ error: '문서를 찾을 수 없습니다.' });
   if (doc.author_id !== req.user.id) {
     return res.status(403).json({ error: '본인 문서만 제출할 수 있습니다.' });
@@ -98,15 +104,16 @@ router.patch('/:id/submit', (req, res) => {
     return res.status(400).json({ error: '임시저장 문서만 제출할 수 있습니다.' });
   }
   const { approver_id } = req.body;
-  db.prepare(`
-    UPDATE documents SET status = 'pending', approver_id = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `).run(approver_id || null, req.params.id);
+  await db.query(`
+    UPDATE documents SET status = 'pending', approver_id = $1, updated_at = NOW()
+    WHERE id = $2
+  `, [approver_id || null, req.params.id]);
   res.json({ message: '결재 요청이 제출되었습니다.' });
 });
 
-router.delete('/:id', (req, res) => {
-  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+router.delete('/:id', async (req, res) => {
+  const { rows } = await db.query('SELECT * FROM documents WHERE id = $1', [req.params.id]);
+  const doc = rows[0];
   if (!doc) return res.status(404).json({ error: '문서를 찾을 수 없습니다.' });
   if (doc.author_id !== req.user.id && req.user.role !== 'admin') {
     return res.status(403).json({ error: '삭제 권한이 없습니다.' });
@@ -114,7 +121,7 @@ router.delete('/:id', (req, res) => {
   if (doc.status === 'approved') {
     return res.status(400).json({ error: '승인된 문서는 삭제할 수 없습니다.' });
   }
-  db.prepare('DELETE FROM documents WHERE id = ?').run(req.params.id);
+  await db.query('DELETE FROM documents WHERE id = $1', [req.params.id]);
   res.json({ message: '문서가 삭제되었습니다.' });
 });
 
