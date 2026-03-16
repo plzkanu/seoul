@@ -27,6 +27,19 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE INDEX IF NOT EXISTS idx_docs_author ON documents(author_id);
 CREATE INDEX IF NOT EXISTS idx_docs_status ON documents(status);
 
+-- document_attachments 테이블 (파일첨부)
+CREATE TABLE IF NOT EXISTS document_attachments (
+  id SERIAL PRIMARY KEY,
+  document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  original_name TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  file_size INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_attachments_document ON document_attachments(document_id);
+
 -- 초기 사용자 (비밀번호: admin123, user123)
 INSERT INTO users (username, password, name, role) VALUES
   ('admin', '$2a$10$tIs5SUHGb6wkW7i3AijulOAuPVwVtixOfqOek8Wx72M62skA1g.Ri', '관리자', 'admin'),

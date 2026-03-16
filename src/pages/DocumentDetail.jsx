@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { documents, users } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +17,8 @@ export default function DocumentDetail() {
   const [submitApprover, setSubmitApprover] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -30,7 +32,36 @@ export default function DocumentDetail() {
   const canApprove = doc?.status === 'pending' && (doc.approver_id === user?.id || user?.role === 'admin' || !doc.approver_id);
   const canReject = canApprove;
   const canSubmit = doc?.status === 'draft' && doc.author_id === user?.id;
+  const canAddAttachment = doc?.status === 'draft' && doc.author_id === user?.id;
   const canDelete = doc && (doc.author_id === user?.id || user?.role === 'admin') && doc.status !== 'approved';
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      await documents.uploadAttachments(id, files);
+      setDoc(await documents.get(id));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attId) => {
+    if (!confirm('첨부파일을 삭제하시겠습니까?')) return;
+    setActionLoading(true);
+    try {
+      await documents.deleteAttachment(id, attId);
+      setDoc(await documents.get(id));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleAction = async (action, approverId) => {
     setActionLoading(true);
@@ -75,6 +106,51 @@ export default function DocumentDetail() {
           {doc.approved_at && <span>결재일: {new Date(doc.approved_at).toLocaleString('ko-KR')}</span>}
         </div>
         <div className="doc-content">{doc.content}</div>
+        <div className="doc-attachments">
+          <h4>첨부파일</h4>
+          {canAddAttachment && (
+            <div className="attachment-upload">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.zip,.hwp"
+                onChange={handleFileUpload}
+                disabled={uploading}
+              />
+              {uploading && <span className="uploading">업로드 중...</span>}
+            </div>
+          )}
+          {doc.attachments && doc.attachments.length > 0 ? (
+            <ul>
+              {doc.attachments.map((att) => (
+                <li key={att.id}>
+                  <button
+                    type="button"
+                    className="link-download"
+                    onClick={() => documents.downloadAttachment(id, att.id, att.original_name)}
+                  >
+                    {att.original_name}
+                  </button>
+                  {att.file_size && <span className="file-size"> ({(att.file_size / 1024).toFixed(1)} KB)</span>}
+                  {canAddAttachment && (
+                    <button
+                      type="button"
+                      className="btn-remove btn-remove-small"
+                      onClick={() => handleDeleteAttachment(att.id)}
+                      disabled={actionLoading}
+                      aria-label="삭제"
+                    >
+                      ×
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-attachments">첨부파일 없음</p>
+          )}
+        </div>
         <div className="doc-actions">
           {canSubmit && (
             <div className="submit-inline">

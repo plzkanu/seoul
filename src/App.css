@@ -310,6 +310,50 @@
   margin-top: 0.5rem;
 }
 
+.form-group input[type="file"] {
+  padding: 0.5rem;
+}
+
+.file-list {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.file-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  font-size: 0.9rem;
+}
+
+.file-list .file-size {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.btn-remove {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.btn-remove:hover {
+  color: var(--danger);
+}
+
+.form-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 /* Document detail */
 .doc-detail-header {
   margin-bottom: 1rem;
@@ -349,6 +393,77 @@
   white-space: pre-wrap;
   line-height: 1.6;
   margin-bottom: 1.5rem;
+}
+
+.doc-attachments {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: 8px;
+}
+
+.doc-attachments h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.doc-attachments ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-attachments li {
+  padding: 0.35rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.link-download {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.link-download:hover {
+  text-decoration: underline;
+}
+
+.doc-attachments .file-size {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.attachment-upload {
+  margin-bottom: 0.75rem;
+}
+
+.attachment-upload input[type="file"] {
+  font-size: 0.9rem;
+}
+
+.uploading {
+  margin-left: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.btn-remove-small {
+  margin-left: auto;
+  padding: 0 0.35rem;
+  font-size: 1.1rem;
+}
+
+.empty-attachments {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
 }
 
 .doc-actions {

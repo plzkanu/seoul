@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documents, users } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -9,12 +9,23 @@ export default function DocumentForm() {
   const [approverId, setApproverId] = useState('');
   const [userList, setUserList] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const fileInputRef = useRef(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     users.approvers().then(setUserList).catch(() => setUserList([]));
   }, []);
+
+  const handleFileChange = (e) => {
+    setSelectedFiles(Array.from(e.target.files || []));
+  };
+
+  const removeFile = (idx) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleSubmit = async (e, asDraft = false) => {
     e.preventDefault();
@@ -25,6 +36,9 @@ export default function DocumentForm() {
         content,
         approver_id: asDraft ? null : (approverId ? parseInt(approverId) : null)
       });
+      if (selectedFiles.length > 0) {
+        await documents.uploadAttachments(id, selectedFiles);
+      }
       if (asDraft) {
         alert('임시저장되었습니다.');
         navigate('/');
@@ -62,6 +76,30 @@ export default function DocumentForm() {
             rows={10}
             required
           />
+        </div>
+        <div className="form-group">
+          <label>파일 첨부 (선택)</label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.zip,.hwp"
+            onChange={handleFileChange}
+          />
+          {selectedFiles.length > 0 && (
+            <ul className="file-list">
+              {selectedFiles.map((f, i) => (
+                <li key={i}>
+                  <span>{f.name}</span>
+                  <span className="file-size">({(f.size / 1024).toFixed(1)} KB)</span>
+                  <button type="button" className="btn-remove" onClick={() => removeFile(i)} aria-label="제거">
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="form-hint">최대 10MB, pdf, doc, docx, xls, xlsx, ppt, pptx, txt, jpg, png, gif, zip, hwp</p>
         </div>
         <div className="form-group">
           <label>결재자 (선택)</label>

@@ -36,6 +36,18 @@ export async function initDb() {
 
     CREATE INDEX IF NOT EXISTS idx_docs_author ON documents(author_id);
     CREATE INDEX IF NOT EXISTS idx_docs_status ON documents(status);
+
+    CREATE TABLE IF NOT EXISTS document_attachments (
+      id SERIAL PRIMARY KEY,
+      document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+      filename TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      file_size INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_attachments_document ON document_attachments(document_id);
   `);
 
   const { rows } = await pool.query('SELECT COUNT(*) as c FROM users');
